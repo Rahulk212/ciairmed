@@ -1,0 +1,138 @@
+<?php
+
+if (!defined('BASEPATH'))
+    exit('No direct script access allowed');
+
+class Payment_type extends CI_Controller {
+
+    function __construct() {
+        parent::__construct();
+
+        $this->load->model('user_model');
+        $this->load->model('Payment_model');
+        $this->load->library('form_validation');
+        $this->load->library('pagination');
+        $this->load->library('pushserver');
+        $this->load->library('email');
+        $this->load->helper('string');
+
+        $data["login_data"] = logindata();
+        $this->app_track();
+    }
+
+    function app_track() {
+        $this->load->library("Util");
+        $util = new Util();
+        $util->app_track();
+    }
+
+    function index() {
+        $cfname = $this->input->get('cfname');
+        $data['cfname'] = $cfname;
+        $data["login_data"] = logindata();
+        $data["user"] = $this->user_model->getUser($data["login_data"]["id"]);
+        $data['success'] = $this->session->flashdata("success");
+        if ($cfname != "") {
+            $totalRows = $this->Payment_model->num_row($cfname);
+            $config = array();
+            $get = $_GET;
+            unset($get['offset']);
+            $config["base_url"] = base_url() . "Payment_type/index?" . http_build_query($get);
+            $config["total_rows"] = $totalRows;
+            $config["per_page"] = 50;
+            $config['page_query_string'] = TRUE;
+            $config['cur_tag_open'] = '<span>';
+            $config['cur_tag_close'] = '</span>';
+            $config['next_link'] = 'Next &rsaquo;';
+            $config['prev_link'] = '&lsaquo; Previous';
+            $this->pagination->initialize($config);
+            $page = ($this->input->get("per_page")) ? $this->input->get("per_page") : 0;
+            $data['query'] = $this->Payment_model->master_get_search($cfname, $config["per_page"], $page);
+            $data["links"] = $this->pagination->create_links();
+            $data["pages"] = $page;
+        } else {
+            $totalRows = $this->Payment_model->num_row($cfname);
+            $config = array();
+            $get = $_GET;
+            $config["base_url"] = base_url() . "Payment_type/index";
+            $config["total_rows"] = $totalRows;
+            $config["per_page"] = 50;
+            $config['page_query_string'] = TRUE;
+            $config["uri_segment"] = 3;
+            $config['cur_tag_open'] = '<span>';
+            $config['cur_tag_close'] = '</span>';
+            $config['next_link'] = 'Next &rsaquo;';
+            $config['prev_link'] = '&lsaquo; Previous';
+            $this->pagination->initialize($config);
+            $sort = $this->input->get("sort");
+            $by = $this->input->get("by");
+            $page = ($this->input->get("per_page")) ? $this->input->get("per_page") : 0;
+            $data['query'] = $this->Payment_model->master_get_search($cfname, $config["per_page"], $page);
+            $data["links"] = $this->pagination->create_links();
+            $data["pages"] = $page;
+        }
+        $this->load->view('header');
+        $this->load->view('nav', $data);
+        $this->load->view('payment_type_list', $data);
+        $this->load->view('footer');
+    }
+
+    public function delete() {
+        $cid = $this->uri->segment('3');
+        $data["login_data"] = logindata();
+        $data["user"] = $this->user_model->getUser($data["login_data"]["id"]);
+        $post['status'] = '0';
+        $post['deleted_by'] = $data["login_data"]["id"];
+        $data['query'] = $this->Payment_model->master_get_spam('payment_type_master', $cid, $post);
+        $this->session->set_flashdata('success', 'Payment type successfully deleted.');
+        redirect('Payment_type');
+    }
+
+    function add() {
+        $data["login_data"] = logindata();
+        $data["user"] = $this->user_model->getUser($data["login_data"]["id"]);
+        $this->load->library('form_validation');
+        $this->form_validation->set_rules('name', 'Name', 'trim|required');
+        $this->form_validation->set_error_delimiters('<span class="text-danger">', '</span>');
+        if ($this->form_validation->run() != FALSE) {
+            $post['name'] = $this->input->post('name');
+            $post['created_by'] = $data["login_data"]["id"];
+            $post['status'] = '1';
+            $data['query'] = $this->Payment_model->master_get_insert("payment_type_master", $post);
+            $this->session->set_flashdata('success', "Payment type successfully added.");
+            redirect("Payment_type");
+        } else {
+            $this->load->view('header');
+            $this->load->view('nav', $data);
+            $this->load->view('payment_type_add', $data);
+            $this->load->view('footer');
+        }
+    }
+
+    function edit() {
+        $data["login_data"] = logindata();
+        $data["user"] = $this->user_model->getUser($data["login_data"]["id"]);
+        $data["cid"] = $this->uri->segment('3');
+        $ccid = $this->uri->segment('3');
+        $this->load->library('form_validation');
+        $this->form_validation->set_rules('name', 'Name', 'trim|required');
+        $this->form_validation->set_error_delimiters('<span class="text-danger">', '</span>');
+        if ($this->form_validation->run() == TRUE) {
+            $post['name'] = $this->input->post('name');
+            $post['updated_by'] = $data["login_data"]["id"];
+            $post['status'] = '1';
+            $data['view_data'] = $this->Payment_model->master_get_update("payment_type_master", $ccid, $post);
+            $this->session->set_flashdata("success", "Payment type successfully updated.");
+            redirect("Payment_type");
+        } else {
+            $data['view_data'] = $this->Payment_model->master_get_table('payment_type_master', array('id' => $ccid), array('id', 'DESC'));
+            $this->load->view('header');
+            $this->load->view('nav', $data);
+            $this->load->view('payment_type_edit', $data, FALSE);
+            $this->load->view('footer');
+        }
+    }
+
+}
+
+?>
